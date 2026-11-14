@@ -4,6 +4,7 @@
 Standard library only. No network. Deterministic: the output is a
 byte-for-byte copy of the bundled image, so repeated runs agree.
 """
+import hashlib
 import os
 import shutil
 import struct
@@ -84,10 +85,22 @@ def main():
     out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(out_dir, exist_ok=True)
     dest = os.path.join(out_dir, "entry.png")
+    source_sha = hashlib.sha256(data).hexdigest()
     with open(dest, "wb") as f:
         f.write(data)
 
-    print("wrote %s (%d bytes, %dx%d)" % (dest, len(data), width, height))
+    with open(dest, "rb") as f:
+        written = f.read()
+    written_sha = hashlib.sha256(written).hexdigest()
+    if len(written) != len(data) or written_sha != source_sha:
+        print("error: verification failed for %s "
+              "(expected %d bytes sha256 %s, got %d bytes sha256 %s)"
+              % (dest, len(data), source_sha, len(written), written_sha),
+              file=sys.stderr)
+        return 1
+
+    print("wrote %s (%d bytes, %dx%d) verified %d bytes sha256 %s"
+          % (dest, len(data), width, height, len(written), written_sha))
     return 0
 
 
